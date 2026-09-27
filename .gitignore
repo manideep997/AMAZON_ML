@@ -1,0 +1,54 @@
+# ============================================================
+# Amazon ML Challenge 2026 — Business Entity Resolution
+# .gitignore
+# ============================================================
+
+# ----- Large dataset files (too big for GitHub, download separately) -----
+dataset/train/*.tsv
+dataset/train/*.parquet
+dataset/test/*.tsv
+dataset/test/*.parquet
+
+# ----- Generated / cached output files -----
+output/*.tsv
+output/*.parquet
+
+# ----- Python cache -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+
+# ----- Virtual environments -----
+venv/
+env/
+.venv/
+.env/
+ENV/
+
+# ----- Jupyter Notebooks -----
+.ipynb_checkpoints/
+*.ipynb
+
+# ----- IDE / OS files -----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# ----- Log files -----
+*.log
+
+# ----- Trained model artifacts (optional: commit if small) -----
+*.lgb
+*.pkl
+*.pickle
+*.joblib
+
+# ----- Build / dist -----
+dist/
+build/
+*.egg-info/

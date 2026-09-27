@@ -1,0 +1,36 @@
+﻿=== S1 ===
+      entity_id            business_name                                      business_address country
+0  S1-925783039      Orelee's Barbershop                1795 Westchester Drive, High Point, NC      US
+1  S1-773889195              Prime Money                       17560 Ellis Road, Tahlequah, OK      US
+2  S1-377745466            B+ Retail Inc                   1712 Montebello Avenue, Phoenix, AZ      US
+3  S1-133037285            Christ Chapel     2100 Cameron Drive, Unit APARTMENT G, Dundalk, MD      US
+4  S1-755362802  Prabhav Business Center  797, Lake Town Block A, Kolkata, Howrah, West Bengal   India
+
+=== S2 ===
+      entity_id                    business_name                                  business_address country
+0  S2-166376419  αñ░αñ╛αñ« αñ«αñ╛αñ░αÑìαñòαÑçαñƒαñ┐αñéαñù αñ¬αÑìαñ░αñ╛αñçαñ╡αÑçαñƒ αñ▓αñ┐αñ«αñ┐αñƒαÑçαñí      KH NO. -570/13, NEW DELHI, WEST DELHI, Delhi   India
+1  S2-764573417     -- Holloway Peak Inc Seafood                         105 ELM ST, MORGANTON, NC      US
+2  S2-639257739         αñåαñªαñ┐αññαÑìαñ» αñ¬αÑìαñ░αÑëαñ¬αñ░αÑìαñƒαÑÇαñ£ αñÅαñ▓αñÅαñ▓αñ¬αÑÇ  G-3/571, GULMOHAR COLONY, BHOPAL, Madhya Pradesh   India
+3  S2-163963287                       Summit Inc             GREENSBORO, NC, 19 1/2 STARDUST TRAIL      US
+4   S2-49942811     Delta Tetlecommunication Inc                   914 PIERPONT AVE, CLEVELAND, OH      US
+
+=== S3 ===
+      entity_id                                business_name                                                                             business_address country
+0  S3-202863386                           wilfordhancock.com                                                                  Mack Rd, Haltom City, Texas      US
+1  S3-859268022  International South Consultants Private Ltd                                                                                          NaN   India
+2   S3-22467283                  LLC Moncada L├⌐arning Center                                                              5780 Fawn Ct, Fort Worth, Texas      US
+3  S3-671162755                               Moyna's Coffee                                                 1 Ivanhoe Ave, PO Box 6009, Cincinnati, Ohio      US
+4  S3-960981775                 Pvt. EFS Print Ventures Ltd.  Door No 183, 41St Cross, 22Nd Main 9Th Block Jayanagar, Bengaluru Urban, Bangalore, α▓òα▓░α│ìα▓¿α▓╛α▓ƒα▓ò   India
+
+=== GT ===
+  source1_entity_id                                                             matched_entity_ids
+0         S1-965667                S2-681193310,S2-743505751,S3-775321672,S3-11291185,S3-860443364
+1       S1-55344266                            S2-249013014,S2-197070651,S3-478195123,S3-384364074
+2      S1-343815751                                         S2-790675320,S2-479876582,S3-878454467
+3      S1-656753428                                          S2-153058913,S2-24659151,S3-679606215
+4      S1-102811957  S2-478959098,S2-553508714,S2-625774905,S3-728090388,S3-928796641,S3-449308785
+5       S1-18727616                            S2-755677256,S3-187831601,S3-641489370,S3-476250621
+6      S1-318373630                                                      S2-660036492,S3-804600254
+7       S1-86989137                                                      S3-274817120,S3-312496301
+8       S1-29845983                                                      S2-648035184,S3-588502663
+9      S1-789009573                                          S2-383871912,S3-74481402,S3-576451439

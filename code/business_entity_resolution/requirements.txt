@@ -1,0 +1,11 @@
+pandas>=2.0.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+lightgbm>=4.3.0
+rapidfuzz>=3.6.0
+jellyfish>=1.0.0
+tqdm>=4.66.0
+pyarrow>=15.0.0
+indic-transliteration>=2.3.0
+anyascii>=0.3.2
+datasketch>=1.6.4
