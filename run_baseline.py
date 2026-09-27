@@ -57,24 +57,17 @@ print('=' * 60)
 print(f'Baseline pipeline started: {time.strftime("%H:%M:%S")}')
 print('=' * 60)
 
-# ── Step 1: Normalize ─────────────────────────────────────────────────────────
+# ── Step 1: Normalize (SEQUENTIAL — load train first, test later to save RAM) ──
 print('\n[Step 1] Normalizing data ...')
 t0 = time.time()
-test_srcs  = normalize_sources(DATA_DIR / 'test',  split='test')
+# Load TRAIN only — test data loaded later after train RAM is freed
 train_srcs = normalize_sources(DATA_DIR / 'train', split='train')
-
-s1_test   = test_srcs['s1']
-s23_test  = pd.concat([test_srcs['s2'],  test_srcs['s3']],  ignore_index=True)
 s1_train  = train_srcs['s1']
 s23_train = pd.concat([train_srcs['s2'], train_srcs['s3']], ignore_index=True)
-
-# Free the source dicts — no longer needed
-del test_srcs, train_srcs
+del train_srcs
 gc.collect()
-
-print(f'Test  — S1: {len(s1_test):,}  S23: {len(s23_test):,}')
 print(f'Train — S1: {len(s1_train):,}  S23: {len(s23_train):,}')
-print(f'Normalize done in {(time.time()-t0)/60:.1f} min')
+print(f'Normalize (train) done in {(time.time()-t0)/60:.1f} min')
 
 # ── Step 2: Load ground truth + sample val set ────────────────────────────────
 print('\n[Step 2] Loading ground truth + sampling val set ...')
@@ -201,13 +194,24 @@ with open(OUT_DIR / 'tuning_results.json', 'w') as fp:
     json.dump({'best_threshold': best_t, 'val_f05': best_f,
                'blocking_recall': br}, fp, indent=2)
 
-# Free ALL train/val data before test blocking — critical for low-RAM machines
-print('\n[Memory] Freeing train/val data before test blocking ...')
+# Free ALL train/val data before loading test — critical for Kaggle 30 GB limit
+print('\n[Memory] Freeing ALL train/val data before loading test set ...')
 del val_cands, val_vec, val_s1, s23_val, val_pairs, val_scores
 del X_val_s1, X_val_s23, val_gt, ground_truth
 del s1_train, s23_train
 gc.collect()
-print('[Memory] Done.')
+gc.collect()  # double-pass to flush cyclic refs
+print('[Memory] Train data freed. Now loading test data ...')
+
+# Load test data NOW (after train freed) — never hold both in RAM at once
+t0 = time.time()
+test_srcs = normalize_sources(DATA_DIR / 'test', split='test')
+s1_test   = test_srcs['s1']
+s23_test  = pd.concat([test_srcs['s2'], test_srcs['s3']], ignore_index=True)
+del test_srcs
+gc.collect()
+print(f'Test  — S1: {len(s1_test):,}  S23: {len(s23_test):,}')
+print(f'Normalize (test) done in {(time.time()-t0)/60:.1f} min')
 
 # ── Step 5: Block on test set ─────────────────────────────────────────────────
 print('\n[Step 5] Blocking on test set ...')
@@ -232,7 +236,7 @@ else:
     candidates, test_vec = run_blocking(
         s1_test, s23_test,
         top_k=50,
-        run_b2=True,
+        run_b2=False,   # MinHash LSH disabled: iterrows on 10M S23 rows = OOM + hours
         run_b3=True, run_b4=True, run_b5=True,
     )
     print(f'Test blocking done in {(time.time()-t0)/60:.1f} min')
