@@ -150,6 +150,22 @@ def _name_len_ratio(a: str, b: str) -> float:
     return min(la, lb) / max(la, lb)
 
 
+def _first_word_match(a: str, b: str) -> float:
+    """Binary: first token of normalized name is exactly the same."""
+    wa = a.split()
+    wb = b.split()
+    if not wa or not wb:
+        return 0.0
+    return float(wa[0] == wb[0])
+
+
+def _addr_token_sort(a: str, b: str) -> float:
+    """Token-sort ratio on address — handles component reordering."""
+    if _HAS_RAPIDFUZZ:
+        return rf_token_sort(a, b) / 100.0
+    return _token_jaccard(a, b)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Single pair → feature vector
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,6 +186,8 @@ FEATURE_NAMES = [
     'f13_country_match',
     'f14_source_pair',
     'f15_name_len_ratio',
+    'f16_first_word_match',      # NEW: first token exact match
+    'f17_addr_token_sort',       # NEW: address token-sort ratio (word-order robust)
 ]
 
 
@@ -210,6 +228,8 @@ def compute_pair_features(
         float(c1 == c2),               # f13
         src_pair,                       # f14
         _name_len_ratio(nn1, nn2),      # f15
+        _first_word_match(nn1, nn2),    # f16 NEW
+        _addr_token_sort(na1, na2),     # f17 NEW
     ]
 
 

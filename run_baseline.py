@@ -252,32 +252,44 @@ print(f'Total test candidate pairs: {n_pairs:,}  avg/S1: {n_pairs/max(1,len(cand
 print(f'\n[Step 6] Scoring test candidate pairs (threshold={best_t:.2f}) ...')
 t0 = time.time()
 
-# Transform S1 (small, ~1.7M × 50k sparse = manageable)
-X_te_s1 = sk_norm(test_vec.transform(s1_test['name_addr'].fillna('')), norm='l2')
+# Transform all S1 test entities once
+X_te_s1   = sk_norm(test_vec.transform(s1_test['name_addr'].fillna('')), norm='l2')
 s1_te_idx = {eid: i for i, eid in enumerate(s1_test['entity_id'])}
 
-# Build lookup: s23_id → text (to score on-demand without loading full matrix)
-s23_text_lookup = dict(zip(s23_test['entity_id'], s23_test['name_addr'].fillna('')))
-
 all_test_pairs = [(s1_id, cid) for s1_id, cands in candidates.items() for cid in cands]
-print(f'Scoring {len(all_test_pairs):,} pairs ...')
+print(f'Total pairs to score: {len(all_test_pairs):,}')
+
+# ── Vectorized: pre-transform UNIQUE S23 candidates once ─────────────────────
+# Each S23 entity may be a candidate for multiple S1s — avoid re-transforming it.
+s23_text_lookup  = dict(zip(s23_test['entity_id'], s23_test['name_addr'].fillna('')))
+unique_s23_ids   = list({p[1] for p in all_test_pairs})
+print(f'Pre-transforming {len(unique_s23_ids):,} unique S23 candidates (once) ...')
+unique_s23_texts = [s23_text_lookup.get(sid, '') for sid in unique_s23_ids]
+X_s23_uniq       = sk_norm(test_vec.transform(unique_s23_texts), norm='l2')
+s23_uniq_idx     = {sid: i for i, sid in enumerate(unique_s23_ids)}
+del unique_s23_texts, s23_text_lookup
+gc.collect()
+print(f'  S23 matrix: {X_s23_uniq.shape}  — scoring with vectorized sparse multiply ...')
 
 matching = defaultdict(set)
 for b in tqdm(range(0, len(all_test_pairs), BATCH), desc='  Scoring test', unit='batch'):
-    batch      = all_test_pairs[b:b+BATCH]
-    s1rs       = [s1_te_idx.get(p[0]) for p in batch]
-    s23_texts  = [s23_text_lookup.get(p[1], '') for p in batch]
-    valid      = [(k, s1rs[k]) for k in range(len(batch)) if s1rs[k] is not None]
+    batch = all_test_pairs[b:b+BATCH]
+    s1rs  = [s1_te_idx.get(p[0])  for p in batch]
+    s23rs = [s23_uniq_idx.get(p[1]) for p in batch]
+    valid = [(k, s1rs[k], s23rs[k]) for k in range(len(batch))
+             if s1rs[k] is not None and s23rs[k] is not None]
     if not valid:
         continue
-    # Transform only this batch's S23 texts (not all 10M)
-    s23_chunk = sk_norm(test_vec.transform([s23_texts[k] for k, _ in valid]), norm='l2')
-    for idx, (k, r1) in enumerate(valid):
-        score = float(X_te_s1[r1].dot(s23_chunk[idx].T).toarray().flatten()[0])
-        if score >= best_t:
+    _, vr1, vr2 = zip(*valid)
+    # Vectorized element-wise dot products — no individual transform calls
+    scores = np.array(
+        X_te_s1[list(vr1)].multiply(X_s23_uniq[list(vr2)]).sum(axis=1)
+    ).flatten()
+    for j, (k, _, _) in enumerate(valid):
+        if scores[j] >= best_t:
             matching[batch[k][0]].add(batch[k][1])
 
-# Ensure all S1 present
+# Ensure every S1 test entity has a row (singletons = empty set)
 for s1_id in all_s1_test_ids:
     if s1_id not in matching:
         matching[s1_id] = set()

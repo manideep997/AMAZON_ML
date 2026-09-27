@@ -125,15 +125,16 @@ LGBM_PARAMS = {
     'objective': 'binary',
     'metric': 'binary_logloss',
     'learning_rate': 0.05,
-    'num_leaves': 127,
-    'min_child_samples': 50,
+    'num_leaves': 255,          # ↑ 127→255: deeper trees, better on 15+ features
+    'min_child_samples': 20,    # ↓ 50→20: captures rarer match patterns
     'feature_fraction': 0.8,
     'bagging_fraction': 0.8,
     'bagging_freq': 5,
-    'lambda_l1': 0.1,
-    'lambda_l2': 0.1,
-    'n_estimators': 1000,
-    'n_jobs': max(1, os.cpu_count() - 1),
+    'lambda_l1': 0.05,          # ↓ lighter L1 reg
+    'lambda_l2': 0.05,          # ↓ lighter L2 reg
+    'min_split_gain': 0.01,     # prevent overly small splits
+    'n_estimators': 2000,       # ↑ 1000→2000: early stopping caps it anyway
+    'n_jobs': -1,               # use ALL available cores
     'verbose': -1,
     'random_state': 42,
 }
@@ -158,7 +159,7 @@ def train_lgbm(
     model.fit(
         X_train, y_train,
         eval_set=[(X_val, y_val)],
-        callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(100)],
+        callbacks=[lgb.early_stopping(75, verbose=False), lgb.log_evaluation(100)],
     )
     return model
 
