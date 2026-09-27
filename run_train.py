@@ -80,12 +80,25 @@ parser.add_argument('--no-b2', action='store_true')
 parser.add_argument('--low-memory', action='store_true',
                     help='Process train/test sequentially to stay under 30 GB RAM '
                          '(recommended for Kaggle free tier). Automatically disables B2.')
+parser.add_argument('--val-size', type=int, default=30_000,
+                    help='Number of S1 training entities to sample for training blocking. '
+                         'Default 30000 matches the original notebook behaviour. '
+                         'Use 0 to block on the full training set (slow, needs >30GB RAM).')
+parser.add_argument('--s23-val-size', type=int, default=2_000_000,
+                    help='Number of S23 training rows to sample for training blocking. '
+                         'Default 2000000 matches the original notebook behaviour.')
 args = parser.parse_args()
 
 if args.low_memory:
     print('[LOW-MEMORY MODE] Train and test data will be processed sequentially.')
     print('[LOW-MEMORY MODE] MinHash LSH (B2) disabled to save RAM.')
     args.no_b2 = True
+
+USE_VAL_SAMPLE = (args.val_size > 0)
+if USE_VAL_SAMPLE and not args.predict_only:
+    print(f'[VAL-SAMPLE MODE] Training blocking will use a sample of '
+          f'{args.val_size:,} S1 entities and {args.s23_val_size:,} S23 rows '
+          f'(matches original notebook behaviour — fast, ~20 S23 chunks).')
 
 OUT_DIR   = Path('output')
 MODEL_DIR = Path('models')
@@ -139,10 +152,31 @@ for _, row in gt_df.iterrows():
 
 if not args.predict_only:
     # ─────────────────────────────────────────────────────────────────────────
-    # Step 2 — Block on training data
+    # Step 2 — Block on training data (sampled val set or full)
     # ─────────────────────────────────────────────────────────────────────────
     print('\n' + '=' * 60)
     print('[Step 2] Blocking on training data ...')
+
+    # Sample S1/S23 if val-sample mode is on (matches original notebook)
+    if USE_VAL_SAMPLE:
+        rng = np.random.default_rng(42)
+        n_s1  = min(args.val_size,      len(s1_train))
+        n_s23 = min(args.s23_val_size,  len(s23_train))
+        s1_block  = s1_train.iloc[rng.choice(len(s1_train),  n_s1,  replace=False)].reset_index(drop=True)
+        s23_block = s23_train.iloc[rng.choice(len(s23_train), n_s23, replace=False)].reset_index(drop=True)
+        # Make sure true-match S23 ids are included so blocking recall isn't artificially low
+        true_s23_ids = set()
+        for ids in ground_truth.values():
+            true_s23_ids |= ids
+        true_s23_in_train = s23_train[s23_train['entity_id'].isin(true_s23_ids)]
+        s23_block = pd.concat([s23_block, true_s23_in_train]).drop_duplicates('entity_id').reset_index(drop=True)
+        print(f'  [VAL-SAMPLE] Using {len(s1_block):,} S1 entities and {len(s23_block):,} S23 rows for training blocking.')
+        del true_s23_in_train
+        gc.collect()
+    else:
+        s1_block  = s1_train
+        s23_block = s23_train
+
     train_cand_cache = OUT_DIR / 'candidate_pairs_train.tsv'
 
     if train_cand_cache.exists():
@@ -156,7 +190,7 @@ if not args.predict_only:
             )
     else:
         cands_train, vec_train = run_blocking(
-            s1_train, s23_train,
+            s1_block, s23_block,
             top_k=args.top_k,
             run_b2=not args.no_b2,
             run_b3=True, run_b4=True, run_b5=True,
