@@ -77,7 +77,15 @@ parser.add_argument('--predict-only', action='store_true')
 parser.add_argument('--top-k', type=int, default=50)
 parser.add_argument('--n-folds', type=int, default=5)
 parser.add_argument('--no-b2', action='store_true')
+parser.add_argument('--low-memory', action='store_true',
+                    help='Process train/test sequentially to stay under 30 GB RAM '
+                         '(recommended for Kaggle free tier). Automatically disables B2.')
 args = parser.parse_args()
+
+if args.low_memory:
+    print('[LOW-MEMORY MODE] Train and test data will be processed sequentially.')
+    print('[LOW-MEMORY MODE] MinHash LSH (B2) disabled to save RAM.')
+    args.no_b2 = True
 
 OUT_DIR   = Path('output')
 MODEL_DIR = Path('models')
@@ -92,15 +100,32 @@ t_total = time.time()
 # ─────────────────────────────────────────────────────────────────────────────
 print('=' * 60)
 print('[Step 1] Normalizing ...')
-test_srcs  = normalize_sources(DATA_DIR / 'test',  split='test')
-train_srcs = normalize_sources(DATA_DIR / 'train', split='train')
 
-s1_test   = test_srcs['s1']
-s23_test  = pd.concat([test_srcs['s2'],  test_srcs['s3']],  ignore_index=True)
-s1_train  = train_srcs['s1']
-s23_train = pd.concat([train_srcs['s2'], train_srcs['s3']], ignore_index=True)
-print(f'Train — S1: {len(s1_train):,}  S23: {len(s23_train):,}')
-print(f'Test  — S1: {len(s1_test):,}   S23: {len(s23_test):,}')
+if args.low_memory and not args.predict_only:
+    # In low-memory mode: load train first, run train pipeline, then free RAM,
+    # then load test for blocking + inference. Never hold both in RAM together.
+    print('  [LOW-MEM] Loading TRAIN data only for now ...')
+    train_srcs = normalize_sources(DATA_DIR / 'train', split='train')
+    s1_train   = train_srcs['s1']
+    s23_train  = pd.concat([train_srcs['s2'], train_srcs['s3']], ignore_index=True)
+    del train_srcs
+    gc.collect()
+    print(f'Train — S1: {len(s1_train):,}  S23: {len(s23_train):,}')
+    # Placeholders — will be loaded later in Step 6
+    s1_test  = None
+    s23_test = None
+else:
+    test_srcs  = normalize_sources(DATA_DIR / 'test',  split='test')
+    train_srcs = normalize_sources(DATA_DIR / 'train', split='train')
+    s1_test   = test_srcs['s1']
+    s23_test  = pd.concat([test_srcs['s2'],  test_srcs['s3']],  ignore_index=True)
+    del test_srcs
+    s1_train  = train_srcs['s1']
+    s23_train = pd.concat([train_srcs['s2'], train_srcs['s3']], ignore_index=True)
+    del train_srcs
+    gc.collect()
+    print(f'Train — S1: {len(s1_train):,}  S23: {len(s23_train):,}')
+    print(f'Test  — S1: {len(s1_test):,}   S23: {len(s23_test):,}')
 
 # Load ground truth
 gt_df = pd.read_csv(DATA_DIR / 'train' / 'train_ground_truth.tsv',
@@ -226,6 +251,22 @@ if not args.predict_only:
     )
     print(f'\n  OOF macro F_0.5 = {results["oof_f05"]:.4f}')
     print(f'  Best threshold  = {results["best_threshold"]}')
+
+    if args.low_memory:
+        # Free ALL train data from RAM before loading test data
+        print('\n  [LOW-MEM] Freeing train data from RAM ...')
+        del s1_train, s23_train, s1_lookup_train, s23_lookup_train
+        del X_train, y_train, pair_ids_train, cands_train
+        del X_tr_s1, tfidf_scores_train, all_train_pairs, vec_train
+        gc.collect()
+        gc.collect()  # double-collect to flush cyclic refs
+        print('  [LOW-MEM] Train RAM freed. Loading test data ...')
+        test_srcs = normalize_sources(DATA_DIR / 'test', split='test')
+        s1_test   = test_srcs['s1']
+        s23_test  = pd.concat([test_srcs['s2'], test_srcs['s3']], ignore_index=True)
+        del test_srcs
+        gc.collect()
+        print(f'  Test — S1: {len(s1_test):,}  S23: {len(s23_test):,}')
 
 else:
     print('  --predict-only: skipping training, loading saved model.')
